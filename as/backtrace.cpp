@@ -11,8 +11,8 @@ void printBackTrace() {
     uint64_t retPosVal = 0;
     uint64_t curPosVal = 0;
     __asm__ __volatile__ (  "movq %%rbp, %0\n\t"
-                            "lea (%%rip), %%rax\n\t"
-                            "movq %%rax, %1\n\t"
+                            "push %%rip\n\t"
+                            "popq %1\n\t"
                             : "=m"(rbpVal), "=m"(curPosVal));
 
     cout << std::hex << curPosVal << endl;

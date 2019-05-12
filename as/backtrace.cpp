@@ -9,13 +9,8 @@ void printBackTrace() {
     uint64_t rbpVal = 0;
     uint64_t oldRbpVal = 0;
     uint64_t retPosVal = 0;
-    uint64_t curPosVal = 0;
     __asm__ __volatile__ (  "movq %%rbp, %0\n\t"
-                            "push %%rip\n\t"
-                            "popq %1\n\t"
-                            : "=m"(rbpVal), "=m"(curPosVal));
-
-    cout << std::hex << curPosVal << endl;
+                            : "=m"(rbpVal));
 
     while(true) {
         if(rbpVal == 0) {

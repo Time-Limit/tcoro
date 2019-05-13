@@ -2,46 +2,87 @@
 
 using namespace std;
 
-typedef struct {
-    int a, b;
-    double d;
-} structParam_t;
+class Coro{
+    enum {
+        ripAddr = 0x00,
+        rsiAddr = 0x08,
+        rdiAddr = 0x10,
+    };
+    public:
+        typedef function<void()> FuncType;
+        Coro(const FuncType &f) : func(f), stackPointer(0), oldReturnAddress(0) {
+            memset(stack, 0, sizeof(stack));
+            *(ptrdiff_t **)(stack + ripAddr) = (ptrdiff_t *)&Coro::run;
+            *(ptrdiff_t **)(stack + rsiAddr) = (ptrdiff_t *)this;
+        }
 
-void A(int e, int f,
-        structParam_t s, int g, int h,
-        long double ld, double m,
-        double n, int i, int j, int k) {
-    cout << "A " << e << endl;
-    cout << "A " << f << endl;
-    cout << "A " << s.a << endl;
-    cout << "A " << s.b << endl;
-    cout << "A " << g << endl;
-    cout << "A " << h << endl;
-    cout << "A " << ld << endl;
-    cout << "A " << m << endl;
-    cout << "A " << n << endl;
-    cout << "A " << i << endl;
-    cout << "A " << j << endl;
-    cout << "A " << k << endl;
+        static void Resume(Coro &c) {
+            typedef uint64_t dataType;
+            dataType rip = *(dataType*)(c.stack + ripAddr);
+            dataType rsi = *(dataType*)(c.stack + rsiAddr);
+            __asm__ __volatile__ (  "leaq %1, %%rsi\n\t"
+                                    "movq 0x8(%%rbp), %%rbx\n\t"
+                                    "movq %%rbx, %2\n\t"
+                                    "movq %0, %%rbx\n\t"
+                                    "movq %%rbx, 0x8(%%rbp)\n\t"
+                                    :"=m"(rip), "=m"(rsi), "=m"(c.oldReturnAddress)
+                                    :);
+        }
+
+    private:
+        FuncType func;
+        unsigned char stack[1024];
+        size_t stackPointer;
+        ptrdiff_t oldReturnAddress;
+        static void run(Coro &c) {
+            if(c.func) { c.func(); }
+            __asm__ __volatile__ (  "movq %%rbx, 0x8(%%rbp)\n\t"
+                                    :
+                                    :"b"(c.oldReturnAddress));
+        }
+};
+
+void func1(int a) {
+    cout << "func1\t" << a << endl;
+    return ;
 }
 
-int pe = 1;
-int pf = 2;
-structParam_t ps;
-int pg = 5;
-int ph = 6;
-long double pld = 7.0;
-double pm = 8.0;
-double pn = 9.0;
-int pi = 10;
-int pj = 11;
-int pk = 12;
+#define outputSpecRegister(name) { \
+    ptrdiff_t val = 0; \
+    __asm__ __volatile__ ("movq %%" name ", %0\n\t" :"=m"(val) :); \
+    std::cout << "" name "" << "\t" << std::hex << val << std::dec << std::endl; \
+}
 
+#define debug() { \
+    outputSpecRegister("rax");\
+    outputSpecRegister("rbx");\
+    outputSpecRegister("rcx");\
+    outputSpecRegister("rdx");\
+    outputSpecRegister("rsi");\
+    outputSpecRegister("rdi");\
+    outputSpecRegister("rbp");\
+    outputSpecRegister("rsp");\
+    outputSpecRegister("r8");\
+    outputSpecRegister("r9");\
+    outputSpecRegister("r10");\
+    outputSpecRegister("r11");\
+    outputSpecRegister("r12");\
+    outputSpecRegister("r13");\
+    outputSpecRegister("r14");\
+    outputSpecRegister("r15");\
+    ptrdiff_t rbp = 0, rsp = 0;\
+    __asm__ __volatile__ (  "movq %%rbp, %0\n\t" "movq %%rsp, %1\n\t" :"=m"(rbp), "=m"(rsp) :);\
+    for(ptrdiff_t i = rsp+8; i <= rbp; i += 8) {\
+        cout << std::hex << i << "\t" << *(uint64_t *)(i) << std::dec << std::endl;\
+    }\
+}
 
 int main() {
-    ps.a = 3;
-    ps.b = 4;
-    ps.d = 10.0;
-    A(pe, pf, ps, pg, ph, pld, pm, pn, pi, pj, pk);
+    Coro c1(std::bind(func1, 10));
+    debug();
+    Coro::Resume(c1);
+    cout << "main" << endl;
+    __asm__ __volatile__ (  "subq $8, %%rsp\n\t" ::);
+    debug();
     return 0;
 }

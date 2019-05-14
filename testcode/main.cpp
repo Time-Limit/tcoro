@@ -2,6 +2,10 @@
 
 using namespace std;
 
+extern "C" {
+    void hackStackFrame(void *);
+};
+
 #define outputSpecRegister(name) { \
     ptrdiff_t val = 0; \
     __asm__ __volatile__ ("movq %%" name ", %0\n\t" :"=m"(val) :); \
@@ -32,62 +36,147 @@ using namespace std;
     }\
 }
 
+class CoroManager;
+
 class Coro{
-    friend void test(Coro &);
+    friend class CoroManager;
     public:
         typedef function<void()> FuncType;
-        Coro(const FuncType &f) : func(f) {
-            memset(stack, 0, sizeof(stack));
-            stackPointer = (((ptrdiff_t)stack) + STACK_SIZE - 0x1 - INIT_FILL_SIZE)&0xfffffff8;
+    private:
+        Coro(const Coro &) = delete;
+        Coro& operator= (const Coro &) = delete;
+        
+        Coro() = default;
+        ~Coro() = default;
+        Coro(const FuncType &f) : func(f), stackPointer(0) {
+            stackPointer = ptrdiff_t(stack + STACK_SIZE - INIT_FILL_SIZE);
+            memset(stack, 0, sizeof(unsigned char)*STACK_SIZE);
             *(uint64_t *)(stack + RETURN_ADDRESS) = (uint64_t)&Coro::run;
-            *(uint64_t *)(stack + RSI) = (uint64_t)this;
-            *(uint64_t *)(stack + RSP) = (uint64_t)stackPointer;
+            *(uint64_t *)(stack + RDI) = (uint64_t)this;
+            *(uint64_t *)(stack + RAX) = (uint64_t)(stack+RETURN_ADDRESS);
         }
 
-        static void Resume(Coro &c);
-        static void Yield(Coro &c);
+        void ResetFunc(const FuncType &f) {
+            func = f;
+        }
 
     private:
         enum {
-            STACK_SIZE = 2048,
+            STACK_SIZE = 2048000,
 
-            RAX = (STACK_SIZE - 0x08)&0xfffffff8,
-            RBX = (STACK_SIZE - 0x10)&0xfffffff8,
-            RCX = (STACK_SIZE - 0x18)&0xfffffff8,
-            RDX = (STACK_SIZE - 0x20)&0xfffffff8,
-            RSI = (STACK_SIZE - 0x28)&0xfffffff8,
-            RDI = (STACK_SIZE - 0x30)&0xfffffff8,
-            RBP = (STACK_SIZE - 0x38)&0xfffffff8,
-            RSP = (STACK_SIZE - 0x40)&0xfffffff8,
-            R8  = (STACK_SIZE - 0x48)&0xfffffff8,
-            R9  = (STACK_SIZE - 0x50)&0xfffffff8,
-            R10 = (STACK_SIZE - 0x58)&0xfffffff8,
-            R11 = (STACK_SIZE - 0x60)&0xfffffff8,
-            R12 = (STACK_SIZE - 0x68)&0xfffffff8,
-            R13 = (STACK_SIZE - 0x70)&0xfffffff8,
-            R14 = (STACK_SIZE - 0x78)&0xfffffff8,
-            R15 = (STACK_SIZE - 0x80)&0xfffffff8,
+            RETURN_ADDRESS = STACK_SIZE - 0x08,
 
-            RETURN_ADDRESS = (STACK_SIZE - 0x88)&0xfffffff8,
+            RAX = (STACK_SIZE - 0x10),
+            RBX = (STACK_SIZE - 0x18),
+            RCX = (STACK_SIZE - 0x20),
+            RDX = (STACK_SIZE - 0x28),
+            RSI = (STACK_SIZE - 0x30),
+            RDI = (STACK_SIZE - 0x38),
+            RBP = (STACK_SIZE - 0x40),
+            R8  = (STACK_SIZE - 0x48),
+            R9  = (STACK_SIZE - 0x50),
+            R10 = (STACK_SIZE - 0x58),
+            R11 = (STACK_SIZE - 0x60),
+            R12 = (STACK_SIZE - 0x68),
+            R13 = (STACK_SIZE - 0x70),
+            R14 = (STACK_SIZE - 0x78),
+            R15 = (STACK_SIZE - 0x80),
 
-            INIT_FILL_SIZE = 0x88,
+            INIT_FILL_SIZE = 0x80,
         };
         unsigned char stack[STACK_SIZE];
         ptrdiff_t stackPointer;
-
-        static unsigned char mainCoroData[INIT_FILL_SIZE];
+        FuncType func;
 
     private:
-        FuncType func;
         static void run(Coro &c) {
             if(c.func) { c.func(); }
         }
 };
 
-void Coro::Resume(Coro &c) {
+class CoroManager;
+
+class CoroKeeper {
+    public:
+        CoroKeeper(Coro *p = nullptr) : ptr(p), ptrCnt(new uint64_t) { *ptrCnt = 1; }
+        CoroKeeper(const CoroKeeper &ck) : ptr(ck.ptr), ptrCnt(ck.ptrCnt) { ++(*ptrCnt); }
+        CoroKeeper& operator= (const CoroKeeper &ck) {
+            if(this == &ck) {
+                return *this;
+            }
+            if(--(*ptrCnt) <= 0) {
+                this->~CoroKeeper();
+            }
+            ptrCnt = ck.ptrCnt;
+            ptr = ck.ptr;
+            ++(*ptrCnt);
+        }
+        ~CoroKeeper() {
+            delete ptrCnt;
+            ptrCnt = nullptr;
+            CoroManager::GetInstance().Recovery(ptr);
+            ptr = nullptr;
+        }
+        Coro* operator-> () {
+            return ptr;
+        }
+    private:
+        uint64_t *ptrCnt;
+        Coro *ptr;
+};
+
+class CoroManager {
+    friend class CoroKeeper;
+    private:
+        CoroManager() = default;
+        ~CoroManager() = default;
+        CoroManager(const CoroManager &) = delete;
+        CoroManager& operator=(const CoroManager &) = delete;
+
+    private:
+        enum {
+            POOL_SIZE = 16,
+        };
+        Coro pool[POOL_SIZE];
+        typedef std::queue<Coro*> CoroPtrPool;
+        CoroPtrPool coroPtrPool;
+
+        Recovery(Coro *ptr) {
+            coroPtrPool.push(ptr);
+        }
+
+    public:
+        static CoroManager& GetInstance() {
+            thread_local CoroManager instance;
+            return instance;
+        }
+
+        bool Resume(Coro &c);
+        bool Yield(Coro &c);
+        CoroKeeper Spawn(const Coro::Func &f) {
+            if(coroPtrPool.empty()) {
+                return CoroKeeper();
+            }
+            CoroKeepr keeper = coroPtrPool().front();
+            coroPtrPool().pop();
+            keeper->~Coro();
+            new (keeper) Coro(f);
+            return keeper;
+        }
+};
+
+bool CoroManager::Resume(Coro &c) {
+    //cout << &c << endl;
+    //printf("ret     = 0x%x\n", c.stack+Coro::RETURN_ADDRESS);
+    //printf("retval  = 0x%x\n", *(uint64_t*)(c.stack+Coro::RETURN_ADDRESS));
+    //printf("runaddr = 0x%x\n", &Coro::run);
+    //printf("pointer = 0x%x\n", c.stackPointer);
+    hackStackFrame((void *)(c.stackPointer));
+    return true;
 }
 
-void Coro::Yield(Coro &c) {
+bool CoroManager::Yield(Coro &c) {
+    return true;
 }
 
 void func1(int a) {
@@ -96,63 +185,14 @@ void func1(int a) {
 }
 
 int main() {
-    Coro c1(std::bind(func1, 10));
+    CoroManager::GetInstance();
+    //Coro c1(std::bind(func1, 10));
 
-    test(c1);
+    //CoroManager::GetInstance().Resume(c1);
 
     //debug();
     cout << "main" << endl;
     //debug();
     return 0;
-}
-
-void test(Coro &c1) {
-
-    int64_t rsp = 0;
-
-    __asm__ __volatile__ (
-            "movq %%rsp, %0\n\t"
-            "leaq %1, %%rsp\n\t"
-            "pushq %%rax\n\t"
-            "pushq %%rbx\n\t"
-            "pushq %%rcx\n\t"
-            "pushq %%rdx\n\t"
-            "pushq %%rsi\n\t"
-            "pushq %%rdi\n\t"
-            "pushq %%rbp\n\t"
-            "pushq %%rsp\n\t"
-            "pushq %%r8\n\t"
-            "pushq %%r9\n\t"
-            "pushq %%r10\n\t"
-            "pushq %%r11\n\t"
-            "pushq %%r12\n\t"
-            "pushq %%r13\n\t"
-            "pushq %%r14\n\t"
-            "pushq %%r15\n\t"
-            : "=m"(rsp)
-            : "m"(c1.stackPointer)
-            );
-
-    __asm__ __volatile__ (
-            "movq %0, %%rsp\n\t"
-            :"=m"(rsp)
-            );
-
-    cout << hex << "rax\t" << *(uint64_t *)(c1.stack + Coro::RAX) << dec << endl;
-    cout << hex << "rbx\t" << *(uint64_t *)(c1.stack + Coro::RBX) << dec << endl;
-    cout << hex << "rcx\t" << *(uint64_t *)(c1.stack + Coro::RCX) << dec << endl;
-    cout << hex << "rdx\t" << *(uint64_t *)(c1.stack + Coro::RDX) << dec << endl;
-    cout << hex << "rsi\t" << *(uint64_t *)(c1.stack + Coro::RSI) << dec << endl;
-    cout << hex << "rdi\t" << *(uint64_t *)(c1.stack + Coro::RDI) << dec << endl;
-    cout << hex << "rbp\t" << *(uint64_t *)(c1.stack + Coro::RBP) << dec << endl;
-    cout << hex << "rsp\t" << *(uint64_t *)(c1.stack + Coro::RSP) << dec << endl;
-    cout << hex << "r8\t" << *(uint64_t *)(c1.stack + Coro::R8) << dec << endl;
-    cout << hex << "r9\t" << *(uint64_t *)(c1.stack + Coro::R9) << dec << endl;
-    cout << hex << "r10\t" << *(uint64_t *)(c1.stack + Coro::R10) << dec << endl;
-    cout << hex << "r11\t" << *(uint64_t *)(c1.stack + Coro::R11) << dec << endl;
-    cout << hex << "r12\t" << *(uint64_t *)(c1.stack + Coro::R12) << dec << endl;
-    cout << hex << "r13\t" << *(uint64_t *)(c1.stack + Coro::R13) << dec << endl;
-    cout << hex << "r14\t" << *(uint64_t *)(c1.stack + Coro::R14) << dec << endl;
-    cout << hex << "r15\t" << *(uint64_t *)(c1.stack + Coro::R15) << dec << endl;
 }
 

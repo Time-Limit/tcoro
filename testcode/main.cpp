@@ -120,6 +120,8 @@ class CoroKeeper {
         Coro* operator-> () {
             return ptr;
         }
+        Coro* operator() {
+        }
     private:
         uint64_t *ptrCnt;
         Coro *ptr;

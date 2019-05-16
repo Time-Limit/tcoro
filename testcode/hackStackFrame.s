@@ -6,11 +6,6 @@
 .type hackStackFrame_dropCurStack, @function
 hackStackFrame_dropCurStack:
     movq (%rdi), %rsp
-
-    movq (%rdi), %rax
-    addq $0x78, %rax;
-    movq %rax, (%rdi)
-
     popq %r15
     popq %r14
     popq %r13
@@ -26,6 +21,7 @@ hackStackFrame_dropCurStack:
     popq %rcx
     popq %rbx
     popq %rax
+    movq %rsp, (%rdi)
     movq %rax, %rsp
 
     ret
@@ -50,16 +46,10 @@ hackStackFrame_saveCurStack:
     pushq %r13
     pushq %r14
     pushq %r15
-
-    movq (%rsi), %rax
-    subq $0x78, %rax;
-    movq %rax, (%rsi)
+    movq %rsp, (%rsi)
 
     movq (%rdi), %rsp
-    movq (%rdi), %rax
-    addq $0x78, %rax;
-    movq %rax, (%rdi)
-
+    addq $78, (%rdi)
     popq %r15
     popq %r14
     popq %r13

@@ -34,10 +34,8 @@ using namespace std;
 }
 
 void func1(std::string flag) {
-    //cout << flag << "\tbefore" << endl;
     printf("%s\tb\n", flag.c_str());
     CoroManager::GetInstance().Yield();
-    //cout << flag << "\tafter" << endl;
     printf("%s\ta\n", flag.c_str());
     return ;
 }
@@ -45,12 +43,13 @@ void func1(std::string flag) {
 int main() {
     CoroManager::GetInstance();
 
-    CoroKeeper ck = CoroManager::GetInstance().Spawn(std::bind(func1, "A"));
+    CoroKeeper ck1 = CoroManager::GetInstance().Spawn(std::bind(func1, "A"));
+    CoroKeeper ck2 = CoroManager::GetInstance().Spawn(std::bind(func1, "B"));
 
-    ck->Debug();
-
-    CoroManager::GetInstance().Resume(ck);
-    CoroManager::GetInstance().Resume(ck);
+    CoroManager::GetInstance().Resume(ck1);
+    CoroManager::GetInstance().Resume(ck2);
+    CoroManager::GetInstance().Resume(ck1);
+    CoroManager::GetInstance().Resume(ck2);
 
     //debug();
     cout << "main" << endl;

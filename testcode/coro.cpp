@@ -108,6 +108,7 @@ bool CoroManager::Yield() {
         hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
     }
     else {
+        __asm__ __volatile__ ("movq %%rsp, %0; subq $8, %0;" : "=m"(ck->stackPointer));
         hackStackFrame_saveCurStack((void*)(&preCK->stackPointer), ((void*)(&ck->stackPointer)));
     }
 

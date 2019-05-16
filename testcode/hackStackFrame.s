@@ -49,7 +49,6 @@ hackStackFrame_saveCurStack:
     movq %rsp, (%rsi)
 
     movq (%rdi), %rsp
-    addq $0x78, (%rdi)
     popq %r15
     popq %r14
     popq %r13

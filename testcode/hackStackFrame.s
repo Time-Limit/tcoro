@@ -2,11 +2,39 @@
 
 .section .text
 
-.global hackStackFrame
+.global hackStackFrame_dropCurStack
+.type hackStackFrame_dropCurStack, @function
+hackStackFrame_dropCurStack:
+    movq (%rdi), %rsp
 
-.type hackStackFrame, @function
-hackStackFrame:
+    movq (%rdi), %rax
+    addq $0x78, %rax;
+    movq %rax, (%rdi)
+
+    popq %r15
+    popq %r14
+    popq %r13
+    popq %r12
+    popq %r11
+    popq %r10
+    popq %r9
+    popq %r8
+    popq %rbp
+    popq %rdi
+    popq %rsi
+    popq %rdx
+    popq %rcx
+    popq %rbx
+    popq %rax
+    movq %rax, %rsp
+
+    ret
+
+.global hackStackFrame_saveCurStack
+.type hackStackFrame_saveCurStack, @function
+hackStackFrame_saveCurStack:
     movq %rsp, %rax
+    movq (%rsi), %rsp
     pushq %rax
     pushq %rbx
     pushq %rcx
@@ -23,7 +51,15 @@ hackStackFrame:
     pushq %r14
     pushq %r15
 
-    leaq (%rdi), %rsp
+    movq (%rsi), %rax
+    subq $0x78, %rax;
+    movq %rax, (%rsi)
+
+    movq (%rdi), %rsp
+    movq (%rdi), %rax
+    addq $0x78, %rax;
+    movq %rax, (%rdi)
+
     popq %r15
     popq %r14
     popq %r13

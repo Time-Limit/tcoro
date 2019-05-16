@@ -15,9 +15,11 @@ void Coro::run(Coro &c) {
             c.func();
             c.func = nullptr;
             c.status = CORO_STATUS_FINISH;
+            CoroManager::GetInstance().Yield();
         }catch(...){
             c.func = nullptr;
             c.status = CORO_STATUS_FINISH;
+            CoroManager::GetInstance().Yield();
         }
     }
 }
@@ -48,7 +50,8 @@ CoroKeeper::~CoroKeeper() {
 }
 
 extern "C" {
-    void hackStackFrame(void *resumeStackPointer, void *yieldStackPointer);
+    void hackStackFrame_saveCurStack(void *resumeStackPointer, void *yieldStackPointer);
+    void hackStackFrame_dropCurStack(void *resumeStackPointer);
 };
 
 CoroManager::CoroManager() {
@@ -72,15 +75,41 @@ bool CoroManager::Resume(CoroKeeper &ck) {
     if(enableCoroStack.empty()) {
         return false;
     }
+
     //cout << &c << endl;
     //printf("ret     = 0x%x\n", c.stack+Coro::RETURN_ADDRESS);
     //printf("retval  = 0x%x\n", *(uint64_t*)(c.stack+Coro::RETURN_ADDRESS));
     //printf("runaddr = 0x%x\n", &Coro::run);
     //printf("pointer = 0x%x\n", c.stackPointer);
-    hackStackFrame((void *)(ck->stackPointer), (void *)(enableCoroStack.top()->stackPointer));
+    CoroKeeper curCK = enableCoroStack.top();
+    enableCoroStack.push(ck);
+    hackStackFrame_saveCurStack((void *)(&ck->stackPointer), (void *)(&curCK->stackPointer));
     return true;
 }
 
 bool CoroManager::Yield() {
+    if(enableCoroStack.size() <= decltype(enableCoroStack)::size_type(1)) {
+        return false;
+    }
+    CoroKeeper ck;
+    do{
+        CoroKeeper _ = enableCoroStack.top();
+        enableCoroStack.pop();
+        if(_->IsFinish() == false) {
+            ck = _;
+        }
+    }while(0);
+
+    CoroKeeper preCK = enableCoroStack.top();
+    if(ck == nullptr) {
+        hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
+    } else if(ck.IsLast()) {
+        //TODO log error or assert
+        hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
+    }
+    else {
+        hackStackFrame_saveCurStack((void*)(&preCK->stackPointer), ((void*)(&ck->stackPointer)));
+    }
+
     return true;
 }

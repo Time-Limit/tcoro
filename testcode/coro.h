@@ -61,26 +61,26 @@ class Coro{
             CORO_STATUS_FINISH  = 3,
         };
         bool CanResume() const { return status == CORO_STATUS_INIT || status == CORO_STATUS_YIELD; }
-        bool CanYield() const {return status == CORO_STATUS_RUN; }
+        bool CanYield() const { return status == CORO_STATUS_RUN; }
+        bool IsFinish() const { return status == CORO_STATUS_FINISH; }
+
+        void Debug() {
+            printf("0x%x, 0x%x\n", stack, stackPointer);
+        }
 };
 
 class CoroManager;
 
 class CoroKeeper {
     public:
-        CoroKeeper(Coro *p = nullptr) : ptr(p), ptrCnt(new uint64_t) { *ptrCnt = 1; }
+        CoroKeeper(Coro *p = nullptr) : ptr(p), ptrCnt(new uint64_t (1)) {}
         CoroKeeper(const CoroKeeper &ck) : ptr(ck.ptr), ptrCnt(ck.ptrCnt) { ++(*ptrCnt); }
         CoroKeeper& operator= (const CoroKeeper &ck);
         ~CoroKeeper();
-        Coro* operator-> () {
-            return ptr;
-        }
-        Coro& operator*() {
-            return *ptr;
-        }
-        operator Coro*() {
-            return ptr;
-        }
+        Coro* operator-> () { return ptr; }
+        Coro& operator*() { return *ptr; }
+        operator Coro*() { return ptr; }
+        bool IsLast() const { return (*ptrCnt == uint64_t(1)); }
     private:
         uint64_t *ptrCnt;
         Coro *ptr;

@@ -33,9 +33,22 @@ using namespace std;
     }\
 }
 
-void func1(std::string flag) {
+void func2(std::string flag) {
     printf("%s\tb\n", flag.c_str());
     CoroManager::GetInstance().Yield();
+    printf("%s\ta\n", flag.c_str());
+    return ;
+}
+
+void func1(std::string flag) {
+    printf("%s\tb\n", flag.c_str());
+    CoroKeeper ck1 = CoroManager::GetInstance().Spawn(std::bind(func2, "C"));
+    CoroKeeper ck2 = CoroManager::GetInstance().Spawn(std::bind(func2, "D"));
+    CoroManager::GetInstance().Resume(ck1);
+    CoroManager::GetInstance().Resume(ck2);
+    CoroManager::GetInstance().Yield();
+    CoroManager::GetInstance().Resume(ck1);
+    CoroManager::GetInstance().Resume(ck2);
     printf("%s\ta\n", flag.c_str());
     return ;
 }

@@ -34,7 +34,6 @@ hackStackFrame_dropCurStack:
 .type hackStackFrame_saveCurStack, @function
 hackStackFrame_saveCurStack:
     movq %rsp, %rax
-    movq (%rsi), %rsp
     pushq %rax
     pushq %rbx
     pushq %rcx
@@ -50,10 +49,7 @@ hackStackFrame_saveCurStack:
     pushq %r13
     pushq %r14
     pushq %r15
-
-    movq (%rsi), %rax
-    subq $0x78, %rax;
-    movq %rax, (%rsi)
+    movq %rsp, (%rsi)
 
     movq (%rdi), %rsp
     movq (%rdi), %rax

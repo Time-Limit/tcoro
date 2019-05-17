@@ -5,6 +5,7 @@
 #include <stack>
 #include <string.h>
 #include <stddef.h>
+#include <iostream>
 #include <functional>
 
 class CoroManager;
@@ -133,6 +134,11 @@ class CoroManager {
             keeper->~Coro();
             new (keeper) Coro(f);
             return keeper;
+        }
+
+        void Debug() const {
+            std::cout << enableCoroStack.size() << std::endl;
+            std::cout << coroPtrPool.size() << std::endl;
         }
 };
 

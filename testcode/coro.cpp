@@ -10,17 +10,16 @@ Coro::Coro(const FuncType &f) : func(f), stackPointer(0), status(CORO_STATUS_FIN
 }
 
 void Coro::run(Coro &c) {
-    if(c.func) {
-        try{
-            c.func();
-            c.func = nullptr;
-            c.status = CORO_STATUS_FINISH;
-            CoroManager::GetInstance().Yield();
-        }catch(...){
-            c.func = nullptr;
-            c.status = CORO_STATUS_FINISH;
-            CoroManager::GetInstance().Yield();
-        }
+    if(c.func == nullptr) { return; }
+    try{
+        c.func();
+        c.func = nullptr;
+        c.status = CORO_STATUS_FINISH;
+        CoroManager::GetInstance().Yield();
+    }catch(...){
+        c.func = nullptr;
+        c.status = CORO_STATUS_FINISH;
+        CoroManager::GetInstance().Yield();
     }
 }
 
@@ -28,15 +27,13 @@ CoroKeeper& CoroKeeper::operator= (const CoroKeeper &ck) {
     if(this == &ck) {
         return *this;
     }
-    if(--(*ptrCnt) <= 0) {
-        this->~CoroKeeper();
-    }
+    this->~CoroKeeper();
     ptrCnt = ck.ptrCnt;
     ptr = ck.ptr;
     ++(*ptrCnt);
 }
 CoroKeeper::~CoroKeeper() {
-    if(*ptrCnt <= 0) {
+    if(--(*ptrCnt) <= 0) {
         delete ptrCnt;
         ptrCnt = nullptr;
         if(ptr) {
@@ -95,7 +92,7 @@ bool CoroManager::Yield() {
         }
     }while(0);
 
-    CoroKeeper preCK = enableCoroStack.top();
+    Coro* preCK = enableCoroStack.top();
     if(ck == nullptr) {
         hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
     } else if(ck.IsLast()) {

@@ -35,7 +35,7 @@ using namespace std;
 
 void func2(std::string flag) {
     printf("%s\tb\n", flag.c_str());
-    CoroManager::GetInstance().Yield();
+    //CoroManager::GetInstance().Yield();
     printf("%s\ta\n", flag.c_str());
     return ;
 }
@@ -63,6 +63,12 @@ int main() {
     CoroManager::GetInstance().Resume(ck2);
     CoroManager::GetInstance().Resume(ck1);
     CoroManager::GetInstance().Resume(ck2);
+
+    for(int i = 0; i < 20; ++i) {
+        CoroKeeper ck = CoroManager::GetInstance().Spawn(std::bind(func1, "tmp"));
+        CoroManager::GetInstance().Resume(ck);
+        CoroManager::GetInstance().Resume(ck);
+    }
 
     //debug();
     cout << "main" << endl;

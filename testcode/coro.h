@@ -80,6 +80,9 @@ class CoroKeeper {
         Coro* operator-> () { return ptr; }
         Coro& operator*() { return *ptr; }
         operator Coro*() { return ptr; }
+        const Coro* operator-> () const { return ptr; }
+        const Coro& operator*() const { return *ptr; }
+        operator const Coro*() const { return ptr; }
         bool IsLast() const { return (*ptrCnt == uint64_t(1)); }
     private:
         uint64_t *ptrCnt;
@@ -116,6 +119,8 @@ class CoroManager {
             thread_local CoroManager instance;
             return instance;
         }
+
+        bool IsMainCoro(const CoroKeeper &ck) const { return &(*ck) == &pool[0]; }
 
         bool Resume(CoroKeeper &ck);
         bool Yield();

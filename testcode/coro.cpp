@@ -76,13 +76,11 @@ bool CoroManager::Resume(CoroKeeper &ck) {
         return false;
     }
 
-    //cout << &c << endl;
-    //printf("ret     = 0x%x\n", c.stack+Coro::RETURN_ADDRESS);
-    //printf("retval  = 0x%x\n", *(uint64_t*)(c.stack+Coro::RETURN_ADDRESS));
-    //printf("runaddr = 0x%x\n", &Coro::run);
-    //printf("pointer = 0x%x\n", c.stackPointer);
     CoroKeeper curCK = enableCoroStack.top();
     enableCoroStack.push(ck);
+    if(CoroManager::GetInstance().IsMainCoro(curCK) == false) {
+        __asm__ __volatile__ ("movq %%rsp, %0;\n\t subq $0x8, %0;\n\t" : "=m"(curCK->stackPointer) :);
+    }
     hackStackFrame_saveCurStack((void *)(&ck->stackPointer), (void *)(&curCK->stackPointer));
     return true;
 }
@@ -108,6 +106,7 @@ bool CoroManager::Yield() {
         hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
     }
     else {
+        __asm__ __volatile__ ("movq %%rsp, %0; subq $8, %0;" : "=m"(ck->stackPointer));
         hackStackFrame_saveCurStack((void*)(&preCK->stackPointer), ((void*)(&ck->stackPointer)));
     }
 

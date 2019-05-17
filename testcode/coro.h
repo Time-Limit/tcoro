@@ -114,13 +114,13 @@ class CoroManager {
         typedef std::stack<CoroKeeper> CoroStackType;
         CoroStackType enableCoroStack;
 
+        bool IsMainCoro(const CoroKeeper &ck) const { return &(*ck) == &pool[0]; }
+
     public:
         static CoroManager& GetInstance() {
             thread_local CoroManager instance;
             return instance;
         }
-
-        bool IsMainCoro(const CoroKeeper &ck) const { return &(*ck) == &pool[0]; }
 
         bool Resume(CoroKeeper &ck);
         bool Yield();

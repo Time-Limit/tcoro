@@ -76,6 +76,7 @@ bool CoroManager::Resume(CoroKeeper &ck) {
     CoroKeeper curCK = enableCoroStack.top();
     enableCoroStack.push(ck);
     hackStackFrame_saveCurStack((void *)(&ck->stackPointer), (void *)(&curCK->stackPointer));
+
     return true;
 }
 
@@ -83,25 +84,16 @@ bool CoroManager::Yield() {
     if(enableCoroStack.size() <= decltype(enableCoroStack)::size_type(1)) {
         return false;
     }
-    CoroKeeper ck;
-    do{
-        CoroKeeper _ = enableCoroStack.top();
-        enableCoroStack.pop();
-        if(_->IsFinish() == false) {
-            ck = _;
-        }
-    }while(0);
 
-    Coro* preCK = enableCoroStack.top();
-    if(ck == nullptr) {
-        hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
-    } else if(ck.IsLast()) {
-        //TODO log error or assert
-        hackStackFrame_dropCurStack((void*)(&preCK->stackPointer));
+    if(enableCoroStack.top()->IsFinish()) {
+        enableCoroStack.pop();
+        hackStackFrame_dropCurStack(((void*)&(enableCoroStack.top()->stackPointer)));
+        return true;
     }
-    else {
-        hackStackFrame_saveCurStack((void*)(&preCK->stackPointer), ((void*)(&ck->stackPointer)));
-    }
+
+    CoroKeeper ck = enableCoroStack.top();
+    enableCoroStack.pop();
+    hackStackFrame_saveCurStack((void*)(&enableCoroStack.top()->stackPointer), ((void*)(&ck->stackPointer)));
 
     return true;
 }

@@ -54,23 +54,30 @@ void func1(std::string flag) {
 }
 
 int main() {
-    CoroManager::GetInstance();
-
-    CoroKeeper ck1 = CoroManager::GetInstance().Spawn(std::bind(func1, "A"));
-    CoroKeeper ck2 = CoroManager::GetInstance().Spawn(std::bind(func1, "B"));
-
-    CoroManager::GetInstance().Resume(ck1);
-    CoroManager::GetInstance().Resume(ck2);
-    CoroManager::GetInstance().Resume(ck1);
-    CoroManager::GetInstance().Resume(ck2);
-
-    for(int i = 0; i < 20; ++i) {
-        CoroKeeper ck = CoroManager::GetInstance().Spawn(std::bind(func1, "tmp"));
-        CoroManager::GetInstance().Resume(ck);
-        CoroManager::GetInstance().Resume(ck);
-    }
+    CoroManager::GetInstance().Debug();
 
     //debug();
+
+    {
+        //CoroKeeper ck1 = CoroManager::GetInstance().Spawn(std::bind(func2, "A"));
+        //CoroManager::GetInstance().Resume(ck1);
+        CoroKeeper ck1 = CoroManager::GetInstance().Spawn(std::bind(func1, "A"));
+        CoroKeeper ck2 = CoroManager::GetInstance().Spawn(std::bind(func1, "B"));
+
+        CoroManager::GetInstance().Resume(ck1);
+        CoroManager::GetInstance().Resume(ck2);
+        CoroManager::GetInstance().Resume(ck1);
+        CoroManager::GetInstance().Resume(ck2);
+
+        for(int i = 0; i < 20; ++i) {
+            CoroKeeper ck = CoroManager::GetInstance().Spawn(std::bind(func1, "tmp"));
+            CoroManager::GetInstance().Resume(ck);
+            CoroManager::GetInstance().Resume(ck);
+        }
+
+    }
+    CoroManager::GetInstance().Debug();
+
     cout << "main" << endl;
     //debug();
     return 0;

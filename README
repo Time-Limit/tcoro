@@ -1,1 +1,2 @@
-Q: 为什么 libco coctx_t::regs 只有十四个位置。xmm 等其他寄存器如何保存？
+Q: 为什么 libco coctx_t::regs 只有十四个位置。mm 等其他寄存器如何保存？
+A: mm 等寄存器主要用于浮点计算指令(如 SSE、AVX 等)，本库先暂时忽略这些指令集。
